@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Шиншилла-календарь</title>
+    <style>
+        :root {
+            --bg: #FDF5E6; /* Бежевый */
+            --primary: #8B5A2B; /* Коричневый */
+            --primary-light: #A06D3D;
+            --accent: #A0B090; /* Мягкий зеленый */
+            --text: #3E2723;
+            --danger: #D32F2F;
+            --card-bg: #FFFFFF;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
+
+        /* Header & Nav */
+        header { background-color: var(--primary); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
+        .nav-btn { background: none; border: none; color: var(--primary); font-size: 14px; display: flex; flex-direction: column; align-items: center; cursor: pointer; opacity: 0.6; transition: 0.3s; }
+        .nav-btn.active { opacity: 1; font-weight: bold; color: var(--primary-light); }
+        .nav-btn span { font-size: 24px; margin-bottom: 4px; }
+
+        /* Layout & Sections */
+        .section { display: none; padding: 15px; max-width: 800px; margin: 0 auto; }
+        .section.active { display: block; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h2, h3 { margin-bottom: 10px; color: var(--primary); }
+
+        /* Buttons */
+        button { background-color: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 5px 0; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+        button:active { transform: scale(0.98); }
+        .btn-outline { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
+        .btn-primary { background-color: var(--primary); }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* Calendar */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+        .day-name { font-weight: bold; color: var(--primary-light); font-size: 12px; }
+        .cal-day { background: #f0f0f0; border-radius: 6px; padding: 5px; min-height: 60px; display: flex; flex-direction: column; align-items: center; font-size: 14px; position: relative; }
+        .cal-day.today { background: var(--accent); color: white; }
+        .cal-icons { font-size: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: auto; }
+
+        /* History Table */
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: var(--primary); color: white; }
+        .history-filters { margin-bottom: 10px; display: flex; gap: 10px; }
+
+        /* Photo Album */
+        .photo-controls { display: flex; gap: 10px; margin-bottom: 15px; }
+        .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+        .photo-thumb { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; cursor: pointer; }
+        .photo-item { position: relative; }
+        .photo-date { position: absolute; bottom: 5px; left: 5px; right: 5px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; text-align: center; border-radius: 4px; padding: 2px; }
+
+        /* Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal input[type="number"], .modal input[type="text"], .modal select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
+        .modal-actions { display: flex; justify-content: space-between; margin-top: 15px; }
+
+        /* Photo Preview Modal */
+        #photoPreviewImg { width: 100%; max-height: 300px; object-fit: contain; border-radius: 8px; margin: 10px 0; }
+        #fullPhotoImg { width: 100%; border-radius: 8px; }
+
+        /* Utils */
+        .hidden { display: none !important; }
+        .list-item { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .list-item:last-child { border-bottom: none; }
+        .badge { background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 12px; margin-left: 5px; }
+        .text-green { color: var(--accent); font-weight: bold; }
+        .text-red { color: var(--danger); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🐭 ChinCare</h1>
+    </header>
+
+    <!-- ИНФО О ПРИЛОЖЕНИИ / INSTALL -->
+    <div id="installPrompt" class="card hidden" style="margin: 15px; background: #fff3e0; border: 2px solid var(--primary);">
+        <h3>📱 Установите приложение</h3>
+        <p>Добавьте календарь на главный экран для получения уведомлений и работы без интернета!</p>
+        <button id="btnInstall" class="btn-primary">Установить</button>
+        <button id="btnDismissInstall" class="btn-outline">Скрыть</button>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <main id="tab-dashboard" class="section active">
+        <div class="card">
+            <h2>Статус и задачи на сегодня</h2>
+            <ul id="todayTasks" style="list-style: none; padding:0; margin-bottom: 15px;"></ul>
+            <div style="display:flex; justify-content: space-between; margin-bottom: 15px;">
+                <button onclick="requestNotifPerm()" class="btn-outline" style="font-size: 12px;">Уведомления</button>
+                <button onclick="testNotification()" class="btn-outline" style="font-size: 12px;">Тест увед.</button>
+            </div>
+        </div>
+
+        <div class="card action-grid">
+            <button onclick="openModal('walkModal')">🐾 Выгулял</button>
+            <button onclick="logAction('bath')">🛁 Покупал</button>
+            <button onclick="logAction('water')">💧 Поменял воду</button>
+            <button onclick="openModal('weightModal')">⚖️ Записал вес</button>
+            <button onclick="logAction('sand')" class="btn-outline">⏳ Заменить песок</button>
+        </div>
+
+        <div class="card">
+            <h3>Показатели</h3>
+            <div class="list-item"><span>Купаний с новым песком:</span> <span id="statBathCount" class="text-green">0 / 4</span></div>
+            <div class="list-item"><span>Дней до смены воды:</span> <span id="statWaterDays">0</span></div>
+            <div class="list-item"><span>Дней до взвешивания:</span> <span id="statWeightDays">0</span></div>
+        </div>
+
+        <div class="card">
+            <h3>Фото шиншиллы</h3>
+            <div class="photo-controls">
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoSelect(event)">
+                <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handlePhotoSelect(event)">
+                <button onclick="document.getElementById('cameraInput').click()" class="btn-primary">📷 Камера</button>
+                <button onclick="document.getElementById('galleryInput').click()" class="btn-outline">🖼 Галерея</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Прогноз на 7 дней</h3>
+            <div id="weekForecast"></div>
+        </div>
+    </main>
+
+    <!-- CALENDAR -->
+    <main id="tab-calendar" class="section">
+        <div class="card">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)" class="btn-outline">◀</button>
+                <h3 id="calMonthYear">Сентябрь 2023</h3>
+                <button onclick="changeMonth(1)" class="btn-outline">▶</button>
+            </div>
+            <div class="calendar-grid">
+                <div class="day-name">Пн</div><div class="day-name">Вт</div><div class="day-name">Ср</div>
+                <div class="day-name">Чт</div><div class="day-name">Пт</div><div class="day-name">Сб</div><div class="day-name">Вс</div>
+            </div>
+            <div id="calendarDays" class="calendar-grid" style="margin-top: 5px;"></div>
+        </div>
+        <div class="card">
+            <p style="font-size: 12px; color: #666;">Легенда: 🐾 - Выгул, 🛁 - Купание, 💧 - Вода, ⚖️ - Вес, ⏳ - Песок, 📷 - Фото</p>
+        </div>
+    </main>
+
+    <!-- HISTORY -->
+    <main id="tab-history" class="section">
+        <div class="card">
+            <h2>История ухода</h2>
+            <div class="history-filters">
+                <select id="historyFilter" onchange="renderHistory()">
+                    <option value="30">Последние 30 дней</option>
+                    <option value="all">За всё время</option>
+                </select>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="historyTable">
+                    <thead><tr><th>Дата</th><th>Выгул (мин)</th><th>Купание</th><th>Вода</th><th>Вес (г)</th><th>Песок</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- ALBUM -->
+    <main id="tab-album" class="section">
+        <div class="card">
+            <h2>Фотоальбом</h2>
+            <div id="albumGrid" class="album-grid"></div>
+        </div>
+    </main>
+
+    <!-- NAV BAR -->
+    <nav class="nav-bar">
+        <button class="nav-btn active" onclick="switchTab('dashboard', this)"><span>🏠</span>Главная</button>
+        <button class="nav-btn" onclick="switchTab('calendar', this)"><span>📅</span>Календарь</button>
+        <button class="nav-btn" onclick="switchTab('history', this)"><span>📋</span>История</button>
+        <button class="nav-btn" onclick="switchTab('album', this)"><span>📷</span>Альбом</button>
+    </nav>
+
+    <!-- MODALS -->
+    <div id="walkModal" class="modal-overlay">
+        <div class="modal">
+            <h3>Время выгула (минуты)</h3>
+            <input type="number" id="walkMins" placeholder="Например: 30" min="1">
+            <div class="modal-actions">
+                <button onclick="closeModal('walkModal')" class="btn-outline">Отмена</button>
+                <button onclick="saveWalk()" class="btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="weightModal" class="modal-overlay">
+        <div class="modal">
+            <h3>Вес шиншиллы (граммы)</h3>
+            <input type="number" id="weightVal" placeholder="Например: 500" min="1">
+            <div class="modal-actions">
+                <button onclick="closeModal('weightModal')" class="btn-outline">Отмена</button>
+                <button onclick="saveWeight()" class="btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="photoSaveModal" class="modal-overlay">
+        <div class="modal">
+            <h3>Сохранить фото</h3>
+            <img id="photoPreviewImg" src="" alt="Preview">
+            <input type="text" id="photoComment" placeholder="Комментарий (опционально)...">
+            <div class="modal-actions">
+                <button onclick="closeModal('photoSaveModal')" class="btn-outline">Отмена</button>
+                <button onclick="savePhotoToDB()" class="btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="photoViewModal" class="modal-overlay">
+        <div class="modal" style="max-width: 90%;">
+            <p id="fullPhotoDate" style="color:#666; font-size:12px; margin-bottom:5px;"></p>
+            <img id="fullPhotoImg" src="" alt="Full view">
+            <p id="fullPhotoComment" style="margin: 10px 0; font-weight: bold;"></p>
+            <div class="modal-actions">
+                <button onclick="closeModal('photoViewModal')" class="btn-outline">Закрыть</button>
+                <div>
+                    <button id="btnDownloadPhoto" class="btn-primary">⬇ Скачать</button>
+                    <button id="btnDeletePhoto" class="btn-danger">🗑 Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* === 1. STATE & LOCALSTORAGE === */
+        const STORAGE_KEY = 'chinchilla_state';
+        let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+            lastBathDate: null,
+            bathsSinceSandChange: 0,
+            lastWaterDate: null,
+            lastWeightDate: null,
+            logs: {} // logs['YYYY-MM-DD'] = { walk: 0, bath: false, water: false, weight: 0, sand: false }
+        };
+
+        let tempPhotoDataUrl = null;
+        let currentMonthDate = new Date();
+        currentMonthDate.setDate(1);
+
+        function saveState() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            updateUI();
+        }
+
+        function getTodayStr() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function getLog(dateStr) {
+            if (!state.logs[dateStr]) {
+                state.logs[dateStr] = { walk: 0, bath: false, water: false, weight: 0, sand: false };
+            }
+            return state.logs[dateStr];
+        }
+
+        /* === 2. INDEXEDDB FOR PHOTOS === */
+        const DB_NAME = 'ChinchillaDB';
+        let db;
+
+        const initDB = () => new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('photos')) {
+                    const store = db.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('date', 'date', { unique: false });
+                }
+            };
+            req.onsuccess = (e) => { db = e.target.result; resolve(); };
+            req.onerror = (e) => reject(e);
+        });
+
+        const addPhoto = (date, dataUrl, comment) => new Promise(resolve => {
+            const tx = db.transaction('photos', 'readwrite');
+            tx.objectStore('photos').add({ date, dataUrl, comment, timestamp: Date.now() });
+            tx.oncomplete = () => resolve();
+        });
+
+        const getPhotos = () => new Promise(resolve => {
+            const tx = db.transaction('photos', 'readonly');
+            const req = tx.objectStore('photos').getAll();
+            req.onsuccess = () => resolve(req.result.sort((a,b) => b.timestamp - a.timestamp));
+        });
+
+        const deletePhoto = (id) => new Promise(resolve => {
+            const tx = db.transaction('photos', 'readwrite');
+            tx.objectStore('photos').delete(id);
+            tx.oncomplete = () => resolve();
+        });
+
+        /* === 3. LOGIC & RULES === */
+        function calculateDiffDays(dateStr1, dateStr2) {
+            if (!dateStr1 || !dateStr2) return 999;
+            const d1 = new Date(dateStr1);
+            const d2 = new Date(dateStr2);
+            d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
+            return Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+        }
+
+        function getTasksForDate(dateStr) {
+            let tasks = [];
+            const log = getLog(dateStr);
+            
+            // Выгул: каждый день
+            if (!log.walk) tasks.push({ id: 'walk', label: '🐾 Выгулять шиншиллу' });
+            
+            // Купание: раз в 3 дня
+            if (!log.bath) {
+                if (!state.lastBathDate) tasks.push({ id: 'bath', label: '🛁 Покупать в песке' });
+                else if (calculateDiffDays(state.lastBathDate, dateStr) >= 3) tasks.push({ id: 'bath', label: '🛁 Покупать в песке' });
+            }
+
+            // Вода: раз в 2 дня
+            if (!log.water) {
+                if (!state.lastWaterDate) tasks.push({ id: 'water', label: '💧 Поменять воду' });
+                else if (calculateDiffDays(state.lastWaterDate, dateStr) >= 2) tasks.push({ id: 'water', label: '💧 Поменять воду' });
+            }
+
+            // Вес: раз в 7 дней
+            if (!log.weight) {
+                if (!state.lastWeightDate) tasks.push({ id: 'weight', label: '⚖️ Взвесить шиншиллу' });
+                else if (calculateDiffDays(state.lastWeightDate, dateStr) >= 7) tasks.push({ id: 'weight', label: '⚖️ Взвесить шиншиллу' });
+            }
+
+            // Песок: после 4 купаний
+            if (state.bathsSinceSandChange >= 4 && !log.sand) {
+                tasks.push({ id: 'sand', label: '⏳ Заменить песок (4 купания прошло)' });
+            }
+
+            return tasks;
+        }
+
+        /* === 4. UI UPDATES === */
+        async function updateUI() {
+            const today = getTodayStr();
+            const tasks = getTasksForDate(today);
+            
+            // Tasks
+            const tasksUl = document.getElementById('todayTasks');
+            tasksUl.innerHTML = '';
+            if (tasks.length === 0) {
+                tasksUl.innerHTML = '<li class="list-item text-green">✨ Все задачи на сегодня выполнены!</li>';
+            } else {
+                tasks.forEach(t => {
+                    tasksUl.innerHTML += `<li class="list-item text-red">❌ ${t.label}</li>`;
+                });
+            }
+
+            // Stats
+            const bsc = state.bathsSinceSandChange;
+            document.getElementById('statBathCount').innerText = `${bsc} / 4`;
+            document.getElementById('statBathCount').className = bsc >= 4 ? 'text-red' : 'text-green';
+
+            let daysToWater = state.lastWaterDate ? 2 - calculateDiffDays(state.lastWaterDate, today) : 0;
+            if (daysToWater < 0) daysToWater = 0;
+            document.getElementById('statWaterDays').innerText = daysToWater;
+
+            let daysToWeight = state.lastWeightDate ? 7 - calculateDiffDays(state.lastWeightDate, today) : 0;
+            if (daysToWeight < 0) daysToWeight = 0;
+            document.getElementById('statWeightDays').innerText = daysToWeight;
+
+            renderForecast(today);
+            renderCalendar();
+            renderHistory();
+            renderAlbum();
+        }
+
+        function renderForecast(todayStr) {
+            const wrap = document.getElementById('weekForecast');
+            wrap.innerHTML = '';
+            let d = new Date(todayStr);
+            for(let i=1; i<=7; i++) {
+                d.setDate(d.getDate() + 1);
+                let ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                
+                let futureTasks = [];
+                futureTasks.push('🐾');
+                if (state.lastBathDate && calculateDiffDays(state.lastBathDate, ds) % 3 === 0) futureTasks.push('🛁');
+                if (state.lastWaterDate && calculateDiffDays(state.lastWaterDate, ds) % 2 === 0) futureTasks.push('💧');
+                if (state.lastWeightDate && calculateDiffDays(state.lastWeightDate, ds) % 7 === 0) futureTasks.push('⚖️');
+                
+                wrap.innerHTML += `<div class="list-item"><span>${ds.split('-').reverse().join('.')}</span> <span>${futureTasks.join(' ')}</span></div>`;
+            }
+        }
+
+        /* === 5. ACTIONS === */
+        function logAction(type) {
+            const today = getTodayStr();
+            const log = getLog(today);
+
+            if (type === 'bath') {
+                log.bath = true;
+                state.lastBathDate = today;
+                state.bathsSinceSandChange++;
+            } else if (type === 'water') {
+                log.water = true;
+                state.lastWaterDate = today;
+            } else if (type === 'sand') {
+                log.sand = true;
+                state.bathsSinceSandChange = 0;
+            }
+            saveState();
+        }
+
+        function saveWalk() {
+            const mins = document.getElementById('walkMins').value;
+            if (!mins) return;
+            getLog(getTodayStr()).walk = parseInt(mins);
+            closeModal('walkModal');
+            saveState();
+            document.getElementById('walkMins').value = '';
+        }
+
+        function saveWeight() {
+            const w = document.getElementById('weightVal').value;
+            if (!w) return;
+            getLog(getTodayStr()).weight = parseInt(w);
+            state.lastWeightDate = getTodayStr();
+            closeModal('weightModal');
+            saveState();
+            document.getElementById('weightVal').value = '';
+        }
+
+        /* === 6. CALENDAR === */
+        function changeMonth(delta) {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        async function renderCalendar() {
+            const m = currentMonthDate.getMonth();
+            const y = currentMonthDate.getFullYear();
+            const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+            document.getElementById('calMonthYear').innerText = `${monthNames[m]} ${y}`;
+
+            const grid = document.getElementById('calendarDays');
+            grid.innerHTML = '';
+
+            const firstDay = new Date(y, m, 1).getDay();
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+            const startPad = firstDay === 0 ? 6 : firstDay - 1; // Mon = 1
+
+            for (let i = 0; i < startPad; i++) grid.innerHTML += `<div></div>`;
+
+            const allPhotos = await getPhotos();
+            const photoDates = new Set(allPhotos.map(p => p.date));
+
+            const todayStr = getTodayStr();
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                let dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                let log = state.logs[dateStr];
+                
+                let cls = "cal-day";
+                if (dateStr === todayStr) cls += " today";
+
+                let icons = '';
+                if (log) {
+                    if (log.walk) icons += '🐾';
+                    if (log.bath) icons += '🛁';
+                    if (log.water) icons += '💧';
+                    if (log.weight) icons += '⚖️';
+                    if (log.sand) icons += '⏳';
+                }
+                if (photoDates.has(dateStr)) icons += '📷';
+
+                grid.innerHTML += `<div class="${cls}">
+                    <b>${i}</b>
+                    <div class="cal-icons">${icons}</div>
+                </div>`;
+            }
+        }
+
+        /* === 7. HISTORY === */
+        function renderHistory() {
+            const tbody = document.querySelector('#historyTable tbody');
+            tbody.innerHTML = '';
+            const filter = document.getElementById('historyFilter').value;
+            const today = getTodayStr();
+
+            let sortedDates = Object.keys(state.logs).sort((a,b) => new Date(b) - new Date(a));
+            
+            sortedDates.forEach(date => {
+                if (filter === '30' && calculateDiffDays(date, today) > 30) return;
+                let l = state.logs[date];
+                if(l.walk===0 && !l.bath && !l.water && l.weight===0 && !l.sand) return; // пустые
+
+                tbody.innerHTML += `<tr>
+                    <td>${date.split('-').reverse().join('.')}</td>
+                    <td>${l.walk || '-'}</td>
+                    <td>${l.bath ? 'Да' : '-'}</td>
+                    <td>${l.water ? 'Да' : '-'}</td>
+                    <td>${l.weight || '-'}</td>
+                    <td>${l.sand ? 'Да' : '-'}</td>
+                </tr>`;
+            });
+        }
+
+        /* === 8. PHOTO LOGIC === */
+        function handlePhotoSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                tempPhotoDataUrl = ev.target.result;
+                document.getElementById('photoPreviewImg').src = tempPhotoDataUrl;
+                openModal('photoSaveModal');
+            };
+            reader.readAsDataURL(file);
+            e.target.value = ''; // reset
+        }
+
+        async function savePhotoToDB() {
+            const comment = document.getElementById('photoComment').value;
+            await addPhoto(getTodayStr(), tempPhotoDataUrl, comment);
+            closeModal('photoSaveModal');
+            document.getElementById('photoComment').value = '';
+            tempPhotoDataUrl = null;
+            updateUI();
+        }
+
+        async function renderAlbum() {
+            const grid = document.getElementById('albumGrid');
+            grid.innerHTML = '';
+            const photos = await getPhotos();
+            if (photos.length === 0) {
+                grid.innerHTML = '<p>Фото пока нет.</p>';
+                return;
+            }
+            photos.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'photo-item';
+                div.innerHTML = `
+                    <img src="${p.dataUrl}" class="photo-thumb" onclick='viewPhoto(${JSON.stringify(p).replace(/'/g, "&apos;")})'>
+                    <div class="photo-date">${p.date}</div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        let currentPhotoId = null;
+        function viewPhoto(p) {
+            currentPhotoId = p.id;
+            document.getElementById('fullPhotoImg').src = p.dataUrl;
+            document.getElementById('fullPhotoDate').innerText = `Снято: ${p.date.split('-').reverse().join('.')}`;
+            document.getElementById('fullPhotoComment').innerText = p.comment || '';
+            
+            document.getElementById('btnDownloadPhoto').onclick = () => {
+                const a = document.createElement('a');
+                a.href = p.dataUrl;
+                a.download = `Chinchilla_${p.date}.jpg`;
+                a.click();
+            };
+            
+            document.getElementById('btnDeletePhoto').onclick = async () => {
+                if(confirm('Удалить фото?')) {
+                    await deletePhoto(currentPhotoId);
+                    closeModal('photoViewModal');
+                    updateUI();
+                }
+            };
+
+            openModal('photoViewModal');
+        }
+
+        /* === 9. NOTIFICATIONS === */
+        let notifAllowed = false;
+        let lastNotifiedDateStr = null; // Для избежания спама каждую минуту
+
+        function requestNotifPerm() {
+            if (!("Notification" in window)) return alert("Уведомления не поддерживаются браузером.");
+            Notification.requestPermission().then(perm => {
+                if (perm === "granted") {
+                    notifAllowed = true;
+                    alert("Уведомления включены!");
+                }
+            });
+        }
+
+        function testNotification() {
+            if (!notifAllowed && Notification.permission !== "granted") {
+                requestNotifPerm();
+                return;
+            }
+            new Notification("🐭 ChinCare", { body: "Тестовое уведомление! Пора покормить пушистика?", icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐭</text></svg>" });
+        }
+
+        function checkTasksAndNotify() {
+            if (Notification.permission !== "granted") return;
+            const today = getTodayStr();
+            const tasks = getTasksForDate(today);
+            
+            // Если есть задачи и мы еще не уведомляли о текущем состоянии сегодня
+            const taskIds = tasks.map(t=>t.id).join(',');
+            const stateHash = today + "_" + taskIds;
+
+            if (tasks.length > 0 && lastNotifiedDateStr !== stateHash) {
+                new Notification("🐭 ChinCare Напоминание", {
+                    body: `У вас ${tasks.length} невыполненных задач по уходу!`,
+                    icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐭</text></svg>"
+                });
+                lastNotifiedDateStr = stateHash;
+            }
+        }
+        setInterval(checkTasksAndNotify, 60000); // Раз в минуту
+
+        /* === 10. DYNAMIC PWA === */
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#8B5A2B';
+            ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
+            ctx.font = `${size*0.5}px Arial`;
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText("🐭", size/2, size/2 + size*0.05);
+            return canvas.toDataURL('image/png');
+        }
+
+        function setupPWA() {
+            // Manifest
+            const manifest = {
+                name: "Шиншилла-календарь",
+                short_name: "ChinCare",
+                start_url: location.href,
+                display: "standalone",
+                background_color: "#FDF5E6",
+                theme_color: "#8B5A2B",
+                icons: [72, 96, 128, 144, 152, 192, 384, 512].map(size => ({
+                    src: generateIcon(size),
+                    sizes: `${size}x${size}`,
+                    type: "image/png",
+                    purpose: "any maskable"
+                }))
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            const link = document.createElement('link');
+            link.rel = 'manifest'; link.href = manifestUrl;
+            document.head.appendChild(link);
+
+            // Service Worker
+            const swCode = `
+                const CACHE_NAME = 'chincare-v1';
+                self.addEventListener('install', e => {
+                    self.skipWaiting();
+                    e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll([location.href])));
+                });
+                self.addEventListener('activate', e => { self.clients.claim(); });
+                self.addEventListener('fetch', e => {
+                    e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+                });
+            `;
+            const swBlob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(swBlob);
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register(swUrl).catch(console.error);
+            }
+        }
+
+        /* === 11. INSTALL PROMPT === */
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').classList.remove('hidden');
+        });
+
+        document.getElementById('btnInstall').addEventListener('click', async () => {
+            document.getElementById('installPrompt').classList.add('hidden');
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                await deferredPrompt.userChoice;
+                deferredPrompt = null;
+            }
+        });
+        document.getElementById('btnDismissInstall').addEventListener('click', () => {
+            document.getElementById('installPrompt').classList.add('hidden');
+        });
+
+        /* === UTILS & INIT === */
+        function switchTab(tabId, btnElement) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            btnElement.classList.add('active');
+            if(tabId === 'calendar') renderCalendar();
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        window.onload = async () => {
+            setupPWA();
+            await initDB();
+            
+            if (!localStorage.getItem('visited')) {
+                document.getElementById('installPrompt').classList.remove('hidden');
+                localStorage.setItem('visited', 'true');
+            }
+
+            if(Notification.permission === "granted") notifAllowed = true;
+
+            updateUI();
+        };
+    </script>
+</body>
+</html>
