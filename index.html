@@ -116,6 +116,7 @@
 
         <div class="card">
             <h3>Показатели</h3>
+            <div class="list-item"><span>🎂 Возраст:</span> <span id="statAge" class="text-green">...</span></div>
             <div class="list-item"><span>Купаний с новым песком:</span> <span id="statBathCount" class="text-green">0 / 4</span></div>
             <div class="list-item"><span>Дней до смены воды:</span> <span id="statWaterDays">0</span></div>
             <div class="list-item"><span>Дней до взвешивания:</span> <span id="statWeightDays">0</span></div>
@@ -252,6 +253,36 @@
             logs: {} // logs['YYYY-MM-DD'] = { walk: 0, bath: false, water: false, weight: 0, sand: false }
         };
 
+        const BIRTH_DATE = '2022-05-04';
+
+        function getAge() {
+            const birth = new Date(BIRTH_DATE);
+            const now = new Date();
+            let years = now.getFullYear() - birth.getFullYear();
+            let months = now.getMonth() - birth.getMonth();
+            let days = now.getDate() - birth.getDate();
+            if (days < 0) {
+                months--;
+                const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                days += prevMonth.getDate();
+            }
+            if (months < 0) {
+                years--;
+                months += 12;
+            }
+            let parts = [];
+            if (years > 0) parts.push(`${years} ${pluralize(years, 'год', 'года', 'лет')}`);
+            if (months > 0) parts.push(`${months} ${pluralize(months, 'месяц', 'месяца', 'месяцев')}`);
+            if (days > 0) parts.push(`${days} ${pluralize(days, 'день', 'дня', 'дней')}`);
+            return parts.join(' ') || '0 дней';
+        }
+
+        function pluralize(n, one, few, many) {
+            if (n % 10 === 1 && n % 100 !== 11) return one;
+            if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return few;
+            return many;
+        }
+
         let tempPhotoDataUrl = null;
         let currentMonthDate = new Date();
         currentMonthDate.setDate(1);
@@ -365,6 +396,9 @@
                     tasksUl.innerHTML += `<li class="list-item text-red">❌ ${t.label}</li>`;
                 });
             }
+
+            // Age
+            document.getElementById('statAge').innerText = getAge();
 
             // Stats
             const bsc = state.bathsSinceSandChange;
@@ -583,9 +617,21 @@
             openModal('photoViewModal');
         }
 
-        /* === 9. NOTIFICATIONS === */
+        /* === 9. NOTIFICATIONS BY SCHEDULE (MSK) === */
         let notifAllowed = false;
-        let lastNotifiedDateStr = null; // Для избежания спама каждую минуту
+        let notified19 = false; // уведомление в 19:00 МСК
+        let notified21 = false; // уведомление в 21:00 МСК
+        let lastNotifDate = ''; // текущая дата, чтобы сбрасывать флаги в новый день
+
+        function getMoscowHourMinute() {
+            const parts = new Date().toLocaleString('ru-RU', {
+                timeZone: 'Europe/Moscow',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).split(':');
+            return { hour: parseInt(parts[0], 10), minute: parseInt(parts[1], 10) };
+        }
 
         function requestNotifPerm() {
             if (!("Notification" in window)) return alert("Уведомления не поддерживаются браузером.");
@@ -605,24 +651,41 @@
             new Notification("🐭 ChinCare", { body: "Тестовое уведомление! Пора покормить пушистика?", icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐭</text></svg>" });
         }
 
-        function checkTasksAndNotify() {
+        function checkSchedule() {
             if (Notification.permission !== "granted") return;
+
             const today = getTodayStr();
             const tasks = getTasksForDate(today);
             
-            // Если есть задачи и мы еще не уведомляли о текущем состоянии сегодня
-            const taskIds = tasks.map(t=>t.id).join(',');
-            const stateHash = today + "_" + taskIds;
+            // Сброс флагов при смене дня
+            if (lastNotifDate !== today) {
+                notified19 = false;
+                notified21 = false;
+                lastNotifDate = today;
+            }
 
-            if (tasks.length > 0 && lastNotifiedDateStr !== stateHash) {
+            const { hour, minute } = getMoscowHourMinute();
+            const taskCount = tasks.length;
+
+            // 19:00 МСК
+            if (hour === 19 && minute === 0 && !notified19 && taskCount > 0) {
                 new Notification("🐭 ChinCare Напоминание", {
-                    body: `У вас ${tasks.length} невыполненных задач по уходу!`,
+                    body: `У вас ${taskCount} невыполненных ${pluralize(taskCount, 'задача', 'задачи', 'задач')} по уходу за шиншиллой!`,
                     icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐭</text></svg>"
                 });
-                lastNotifiedDateStr = stateHash;
+                notified19 = true;
+            }
+
+            // 21:00 МСК (повторное, если задачи ещё остались)
+            if (hour === 21 && minute === 0 && !notified21 && taskCount > 0) {
+                new Notification("🐭 ChinCare Напоминание (повтор)", {
+                    body: `${taskCount} ${pluralize(taskCount, 'задача', 'задачи', 'задач')} всё ещё не выполнены!`,
+                    icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🐭</text></svg>"
+                });
+                notified21 = true;
             }
         }
-        setInterval(checkTasksAndNotify, 60000); // Раз в минуту
+        setInterval(checkSchedule, 10000); // Проверка каждые 10 секунд
 
         /* === 10. DYNAMIC PWA === */
         function generateIcon(size) {
@@ -735,6 +798,7 @@
             }
 
             if(Notification.permission === "granted") notifAllowed = true;
+            checkSchedule(); // Проверить сразу при загрузке (если время совпало)
 
             updateUI();
         };
