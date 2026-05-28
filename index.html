@@ -81,6 +81,8 @@
 </head>
 <body>
 
+    <img id="iconSourceImg" src="chinchilla_icon.png" style="display:none" alt="">
+
     <header>
         <h1>🐭 ChinCare</h1>
     </header>
@@ -627,15 +629,30 @@
             const canvas = document.createElement('canvas');
             canvas.width = size; canvas.height = size;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#8B5A2B';
-            ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
-            ctx.font = `${size*0.5}px Arial`;
-            ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText("🐭", size/2, size/2 + size*0.05);
+            const img = document.getElementById('iconSourceImg');
+            if (img && img.complete && img.naturalWidth > 0) {
+                // Рисуем изображение, вписывая в квадрат с сохранением пропорций
+                const s = Math.min(img.naturalWidth, img.naturalHeight);
+                const sx = (img.naturalWidth - s) / 2;
+                const sy = (img.naturalHeight - s) / 2;
+                ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+            } else {
+                // Fallback на случай, если изображение не загрузилось
+                ctx.fillStyle = '#8B5A2B';
+                ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
+                ctx.font = `${size*0.5}px Arial`;
+                ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText("🐭", size/2, size/2 + size*0.05);
+            }
             return canvas.toDataURL('image/png');
         }
 
-        function setupPWA() {
+        async function setupPWA() {
+            // Дожидаемся загрузки изображения иконки
+            const img = document.getElementById('iconSourceImg');
+            if (img && !img.complete) {
+                await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+            }
             // Manifest
             const manifest = {
                 name: "Шиншилла-календарь",
@@ -709,7 +726,7 @@
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
         window.onload = async () => {
-            setupPWA();
+            await setupPWA();
             await initDB();
             
             if (!localStorage.getItem('visited')) {
